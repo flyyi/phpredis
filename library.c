@@ -61,7 +61,7 @@
 extern zend_class_entry *redis_ce;
 extern zend_class_entry *redis_exception_ce;
 
-extern int le_pconnect;
+extern int le_redis_pconnect;
 
 /* Helper to reselect the proper DB number when we reconnect */
 static int reselect_db(RedisSock *redis_sock TSRMLS_DC) {
@@ -1787,11 +1787,7 @@ PHP_REDIS_API int redis_sock_connect(RedisSock *redis_sock TSRMLS_DC)
 
     if (redis_sock->persistent) {
         zend_resource *le;
-        if (redis_sock->persistent_id) {
-            persistent_len = spprintf(&persistent_id, 0, "phpredis_%s:%s", host, ZSTR_VAL(redis_sock->persistent_id));
-        } else {
-            persistent_len = spprintf(&persistent_id, 0, "phpredis_%s:%f", host, redis_sock->timeout);
-        }
+        persistent_len = spprintf(&persistent_id, 0, "phpredis:%s", host);
         if ((le = zend_hash_str_find_ptr(&EG(persistent_list), persistent_id, persistent_len)) != NULL && zend_llist_count(le->ptr) > 0) {
             redis_sock->stream = *(php_stream **)zend_llist_get_last(le->ptr);
             zend_llist_remove_tail(le->ptr);
@@ -1805,7 +1801,12 @@ PHP_REDIS_API int redis_sock_connect(RedisSock *redis_sock TSRMLS_DC)
                 php_stream_pclose(redis_sock->stream);
             }
         }
-        persistent_id[8] = ':';
+        efree(persistent_id);
+        if (redis_sock->persistent_id) {
+            spprintf(&persistent_id, 0, "phpredis:%s:%s", host, ZSTR_VAL(redis_sock->persistent_id));
+        } else {
+            spprintf(&persistent_id, 0, "phpredis:%s:%f", host, redis_sock->timeout);
+        }
     }
 
     redis_sock->stream = php_stream_xport_create(host, host_len,
@@ -1898,14 +1899,10 @@ redis_sock_disconnect(RedisSock *redis_sock, int force TSRMLS_DC)
 #endif
                     snprintf(host, sizeof(host), fmtstr, ZSTR_VAL(redis_sock->host), redis_sock->port);
                 }
-                if (redis_sock->persistent_id) {
-                    persistent_len = spprintf(&persistent_id, 0, "phpredis_%s:%s", host, ZSTR_VAL(redis_sock->persistent_id));
-                } else {
-                    persistent_len = spprintf(&persistent_id, 0, "phpredis_%s:%f", host, redis_sock->timeout);
-                }
+                persistent_len = spprintf(&persistent_id, 0, "phpredis:%s", host);
                 if ((le = zend_hash_str_find_ptr(&EG(persistent_list), persistent_id, persistent_len)) == NULL) {
                     zend_resource res;
-                    res.type = le_pconnect;
+                    res.type = le_redis_pconnect;
                     res.ptr = pecalloc(1, sizeof(zend_llist), 1);
                     zend_llist_init(res.ptr, sizeof(void *), NULL, 1);
                     zend_hash_str_update_mem(&EG(persistent_list), persistent_id, persistent_len, &res, sizeof(res));

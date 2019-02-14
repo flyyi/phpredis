@@ -53,7 +53,7 @@ zend_class_entry *redis_exception_ce;
 extern zend_function_entry redis_array_functions[];
 extern zend_function_entry redis_cluster_functions[];
 
-int le_pconnect;
+int le_redis_pconnect;
 
 PHP_INI_BEGIN()
     /* redis arrays */
@@ -843,7 +843,7 @@ PHP_MINIT_FUNCTION(redis)
 #endif
 
     /* Register resource destructors */
-    le_pconnect = zend_register_list_destructors_ex(NULL, redis_connections_pool_dtor,
+    le_redis_pconnect = zend_register_list_destructors_ex(NULL, redis_connections_pool_dtor,
         "phpredis persistent connections pool", module_number);
 
     return SUCCESS;
